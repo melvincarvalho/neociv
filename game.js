@@ -1204,7 +1204,7 @@ function drawSidebar() {
   cx.strokeRect(L + 0.5, 682.5, W - 1, 25);
   cx.lineWidth = 1;
   cx.fillStyle = anyMoves ? '#8fa8c8' : '#3ef0ff'; cx.font = 'bold 11px monospace'; cx.textAlign = 'center';
-  cx.fillText('[ENTER] END TURN ' + G.turn, L + W / 2, 699);
+  cx.fillText('END TURN ' + G.turn + ' — TAP OR [ENTER]', L + W / 2, 699);
   cx.textAlign = 'left';
 }
 function drawMap() {
@@ -1284,7 +1284,7 @@ function drawCityScreen() {
     bx += w2 + 8;
   }
   cx.fillStyle = '#6f87a8'; cx.font = '10px monospace';
-  cx.fillText('PRODUCTION ORDERS — press a number', x + 20, y + 186);
+  cx.fillText('PRODUCTION ORDERS — tap or press a number', x + 20, y + 186);
   const { out: menu, locked } = cityMenu(c);
   for (let i = 0; i < menu.length; i++) {
     const m = menu[i], my = y + 200 + i * 28;
@@ -1328,14 +1328,14 @@ function drawCityScreen() {
   cx.fillStyle = '#7fd0ff';
   cx.fillText('science +' + sci2 + '/t · gold +' + g2 + '/t', rx, y + 438);
   cx.fillStyle = '#6f87a8'; cx.font = '11px monospace';
-  cx.fillText('[R] rush for ' + (b ? Math.max(0, (buildCost(b) - c.shields) * 2) + ' gold' : '—') + '   [ESC] close', x + 20, y + 540);
+  cx.fillText('tap/[R] rush for ' + (b ? Math.max(0, (buildCost(b) - c.shields) * 2) + ' gold' : '—') + '   tap outside/[ESC] close', x + 20, y + 540);
 }
 function drawTechScreen() {
   const { x, y } = panel(880, 560, 'KNOWLEDGE OF THE AGES');
   const civ = G.civs[0];
   cx.fillStyle = '#cfe6ff'; cx.font = '11px monospace';
   cx.fillText(civ.res ? 'Researching ' + civ.res.toUpperCase() + ' — ' + civ.beakers + '/' + TECHS[civ.res].cost + ' beakers'
-    : 'Choose a discovery — press its number', x + 20, y + 54);
+    : 'Choose a discovery — tap it or press its number', x + 20, y + 54);
   const avail = TECH_ORDER.filter(k => !civ.techs[k] && !TECHS[k].req.some(r => !civ.techs[r]));
   let i = 0;
   for (const k of TECH_ORDER) {
@@ -1356,7 +1356,7 @@ function drawTechScreen() {
     cx.fillText((t.req.length ? 'needs ' + t.req.join(', ') + '  ' : '') + (gives.length ? '→ ' + gives.join(', ') : ''), x + 30, ty + 27);
   }
   cx.fillStyle = '#6f87a8'; cx.font = '11px monospace';
-  cx.fillText('[ESC] close', x + 20, y + 540);
+  cx.fillText('tap outside/[ESC] close', x + 20, y + 540);
 }
 function drawTitle() {
   cx.fillStyle = '#020409'; cx.fillRect(0, 0, 1280, 720);
@@ -1395,9 +1395,10 @@ function drawTitle() {
   cx.fillText('an empire of light — a Civilization tribute', 640, 592);
   if (!G || !G.shotMode) {
     cx.fillStyle = '#e6f8ff'; cx.font = 'bold 14px monospace';
-    cx.fillText('PRESS SPACE — found LUMEN, out-think UMBRA', 640, 640);
+    cx.fillText('PRESS SPACE OR TAP — found LUMEN, out-think UMBRA', 640, 640);
     cx.fillStyle = '#7f98b8'; cx.font = '12px monospace';
-    cx.fillText('arrows+QEZC move · F found · B city · T science · ENTER end turn', 640, 668);
+    cx.fillText('tap tiles to move · arrows+QEZC · F found · B city · T science · ENTER end turn', 640, 668);
+    if (COARSE) { cx.fillStyle = '#5a7090'; cx.fillText('best on a phone in landscape', 640, 690); }
   }
   cx.textAlign = 'left';
 }
@@ -1418,7 +1419,7 @@ function drawEnd() {
     myCities(1).length + ' · kills ' + G.kills[0], 640, 384);
   if (!G.shotMode) {
     cx.fillStyle = '#3ef0ff'; cx.font = 'bold 13px monospace';
-    cx.fillText('[SPACE] found a new world', 640, 448);
+    cx.fillText('[SPACE] or tap — found a new world', 640, 448);
   }
   cx.textAlign = 'left';
 }
@@ -1440,6 +1441,7 @@ function beep(f, d, type) {
   if (!G || G.muted) return;
   try {
     AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
     const o = AC.createOscillator(), g = AC.createGain();
     o.type = type || 'square'; o.frequency.value = f;
     g.gain.setValueAtTime(0.06, AC.currentTime);
@@ -1526,12 +1528,42 @@ function onKey(e) {
   }
 }
 function onClick(e) {
-  if (!G || G.screen === 'title') { newGame(URLSEED); G.screen = 'map'; return; }
+  if (!G || G.screen === 'title') { newGame(URLSEED); G.screen = 'map'; beep(440, 0.1); return; }
   const r = cv.getBoundingClientRect();
   const px = (e.clientX - r.left) * (1280 / r.width), py = (e.clientY - r.top) * (720 / r.height);
-  if (G.screen === 'city' || G.screen === 'tech') { return; }
+  if (G.screen === 'end') { newGame(G.seed + 1); G.screen = 'map'; beep(440, 0.1); return; }
+  if (G.screen === 'city') {
+    const c = G.cities.find(x => x.id === G.focusCity);
+    if (!c) { G.screen = 'map'; return; }
+    const x = (SBX - 880) / 2, y = (720 - 560) / 2; // panel(880, 560)
+    if (px < x || px > x + 880 || py < y || py > y + 560) { G.screen = 'map'; return; }
+    const menu = cityMenu(c).out;
+    const i = Math.floor((py - (y + 200)) / 28);
+    if (px >= x + 20 && px <= x + 500 && py >= y + 200 && i >= 0 && i < menu.length && py - (y + 200) - i * 28 <= 24) {
+      if (menu[i].ok) { setBuild(c, menu[i].k); beep(520, 0.06); }
+      return;
+    }
+    if (py >= y + 526 && px <= x + 340 && c.build) { // rush line
+      const need = Math.max(0, (buildCost(c.build) - c.shields) * 2);
+      if (G.civs[0].gold >= need) { G.civs[0].gold -= need; c.shields = buildCost(c.build); beep(660, 0.1); }
+    }
+    return;
+  }
+  if (G.screen === 'tech') {
+    const x = (SBX - 880) / 2, y = (720 - 560) / 2; // panel(880, 560)
+    if (px < x || px > x + 880 || py < y || py > y + 560) { G.screen = 'map'; return; }
+    const civ = G.civs[0];
+    const avail = TECH_ORDER.filter(t => !civ.techs[t] && !TECHS[t].req.some(rq => !civ.techs[rq]));
+    const i = Math.floor((py - (y + 80)) / 40);
+    if (px >= x + 20 && px <= x + 640 && py >= y + 80 && i >= 0 && i < TECH_ORDER.length && py - (y + 80) - i * 40 <= 32) {
+      const k = TECH_ORDER[i];
+      if (avail.includes(k)) { setResearch(0, k); beep(520, 0.06); G.screen = 'map'; }
+    }
+    return;
+  }
   if (px >= SBX) {
-    if (py >= 682) { endTurn(); if (!G.sel) selectNext(); return; }
+    if (py >= 682) { endTurn(); beep(330, 0.07); if (!G.sel) selectNext(); return; }
+    if (py >= 96 && py < 112) { G.screen = 'tech'; return; } // research bar
     // city roster rows
     const i = Math.floor((py - 216) / 34);
     const cs = myCities(0);
@@ -1540,9 +1572,25 @@ function onClick(e) {
   }
   const tx = Math.floor(px / TS), ty = Math.floor(py / TS);
   if (!inb(tx, ty)) return;
+  const sel = G.units.find(u => u.id === G.sel && u.civ === 0);
+  // tap the selected unit's own tile: settlers found, the rest hold
+  if (sel && sel.moves > 0 && sel.x === tx && sel.y === ty) {
+    if (sel.kind === 'settler') { if (foundCity(sel)) beep(392, 0.15); else msg('Too close to another city'); }
+    else { sel.moves = 0; selectNext(); }
+    return;
+  }
   const mine = unitsAt(tx, ty).filter(u => u.civ === 0 && u.moves > 0);
   if (mine.length) { G.sel = mine[0].id; G.inspect = null; return; }
   const c = cityAt(tx, ty);
+  if (sel && sel.moves > 0 && terr(tx, ty) !== OCEAN) {
+    // tap-to-move: adjacent tile orders the unit there (attack, capture, garrison included)
+    if (Math.max(Math.abs(tx - sel.x), Math.abs(ty - sel.y)) === 1) { playerMove(tx - sel.x, ty - sel.y); return; }
+    // farther: one pathfound step toward the tapped tile — except toward my own city, that governs it
+    if (!(c && c.civ === 0)) {
+      const st = bfsNext(sel.x, sel.y, tx, ty, 0);
+      if (st) { playerMove(st.dx, st.dy); return; }
+    }
+  }
   if (c && c.civ === 0) { G.focusCity = c.id; G.screen = 'city'; return; }
   G.sel = null; G.inspect = { x: tx, y: ty };
 }
@@ -1644,6 +1692,7 @@ const SHOTS = {
 // ------------------------------ boot ------------------------------
 const QS = new URLSearchParams(location.search);
 const URLSEED = +(QS.get('seed') || CAREER_SEED) || CAREER_SEED;
+const COARSE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 function boot() {
   cv = document.getElementById('cv');
   cx = cv.getContext('2d');
